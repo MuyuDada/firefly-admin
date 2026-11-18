@@ -29,7 +29,8 @@ export function b64ToUtf8(b64) {
 
 const API = "https://api.github.com";
 
-export const SHUOSHUO_DIR = "src/content/shuoshuo";
+// 博客的「说说 / 动态」集合：src/content/dynamic（frontmatter: published / location / pinned）
+export const SHUOSHUO_DIR = "src/content/dynamic";
 export const POSTS_DIR = "src/content/posts";
 export const IMAGE_DIR = "public/shuoshuo/images";
 export const POST_IMAGE_DIR = "src/content/posts/images";
@@ -160,15 +161,12 @@ export function yq(s) {
   return `"${String(s ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
-// date 为带时区的 ISO 字符串（不加引号，让 js-yaml 解析成 Date）
-export function buildMarkdown({ date, tags = [], image = "", content = "" }) {
-  const lines = ["---", `date: ${date}`];
-  if (image) lines.push(`image: ${image}`);
-  if (tags.length) {
-    lines.push("tags:");
-    for (const t of tags) lines.push(`  - ${t}`);
-  }
-  lines.push("---", "", content.trim(), "");
+// 动态 frontmatter：published 用「YYYY-MM-DD HH:mm:ss」（博客现有格式），location 可选
+export function buildMarkdown({ date, location = "", pinned = false, content = "" }) {
+  const lines = ["---", `published: ${date}`];
+  if (location) lines.push(`location: ${yq(location)}`);
+  if (pinned) lines.push("pinned: true");
+  lines.push("---", "", String(content || "").trim(), "");
   return lines.join("\n");
 }
 
@@ -244,14 +242,19 @@ export function normalizePost(body) {
   const content = String(body.content || "").trim();
 
   let date = String(body.date || "").trim();
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(date)) date += ":00+08:00";
-  else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(date)) date += "+08:00";
-  else if (!/^\d{4}-\d{2}-\d{2}/.test(date)) {
+  // 统一成本地时间字符串 YYYY-MM-DD HH:mm:ss（与博客 dynamic 现有文件一致）
+  const dm = date.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (dm) {
+    date = `${dm[1]} ${dm[2]}:${dm[3]}:${dm[4] || "00"}`;
+  } else {
     // 兜底：按东八区取当前时间
-    date = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 19) + "+08:00";
+    date = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 19).replace("T", " ");
   }
 
-  // 文件名取 YYYYMMDDHHmmss，可排序且基本唯一
-  const filename = `${date.replace(/[-:T+]/g, "").slice(0, 14)}.md`;
-  return { date, tags, image, content, filename };
+  // 文件名沿用博客现有格式 YYYY-MM-DD-HHmmss.md，按名排序即按时间排序
+  const [dpart, tpart] = date.split(" ");
+  const filename = `${dpart}-${tpart.replace(/:/g, "")}.md`;
+  const location = String(body.location || "").trim();
+  const pinned = body.pinned === true;
+  return { date, location, pinned, content, filename };
 }

@@ -9,8 +9,9 @@ import { requireAuth, unauthorized } from "./_auth.js";
 const NAME_RE = /^[A-Za-z0-9_-]+\.(md|mdx)$/;
 const MAX_CONTENT = 200 * 1024;
 
+// 与博客仓库 src/content/spec 下现有文件对应
 export const SPEC_LABELS = {
-	"about.mdx": "关于",
+	"about.md": "关于页",
 	"friends.mdx": "友链页",
 	"guestbook.md": "留言板页",
 	"privacy.md": "隐私政策",

@@ -67,12 +67,94 @@ export function splitObjects(body) {
   return objs;
 }
 
+// 带区间的对象切分：用于在原数组段内做局部替换（保住注释与格式）
+export function splitObjectRanges(body) {
+  const out = [];
+  let depth = 0;
+  let start = -1;
+  let inStr = null;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    const next = body[i + 1];
+    if (inStr) {
+      if (ch === "\\") i++;
+      else if (ch === inStr) inStr = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      inStr = ch;
+      continue;
+    }
+    if (ch === "/" && next === "/") {
+      const nl = body.indexOf("\n", i);
+      if (nl === -1) break;
+      i = nl;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      const end = body.indexOf("*/", i);
+      if (end === -1) break;
+      i = end + 1;
+      continue;
+    }
+    if (ch === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth === 0 && start >= 0) {
+        out.push({ start, end: i, text: body.slice(start, i + 1) });
+        start = -1;
+      }
+    }
+  }
+  return out;
+}
+
 function pickString(obj, key) {
   const m = obj.match(
     new RegExp(`${key}\\s*:\\s*(?:"((?:[^"\\\\]|\\\\.)*)"|'((?:[^'\\\\]|\\\\.)*)')`),
   );
   if (!m) return "";
   return (m[1] !== undefined ? m[1] : m[2]).replace(/\\(["'\\])/g, "$1");
+}
+
+const KNOWN_KEYS = new Set(["title", "imgurl", "desc", "siteurl", "tags", "weight", "enabled"]);
+const KEY_LINE_RE = /^([A-Za-z_$][\w$]*)\s*:\s*(.*)$/;
+
+// 单行未知字段（如 recommended / previewurl / recommendedTheme）：原行保留，
+// 否则「编辑一条友链」会把博客里这些额外配置写丢
+function pickExtras(obj) {
+	const extras = [];
+	for (const rawLine of obj.split(/\r?\n/)) {
+		const line = rawLine.trim();
+		if (!line || line.startsWith("//") || line.startsWith("/*") || line.startsWith("*")) continue;
+		const m = line.match(KEY_LINE_RE);
+		if (!m || KNOWN_KEYS.has(m[1])) continue;
+		// 值在同一行内闭合才保留（跨行的数组/对象交给原样回写）
+		let depth = 0;
+		let inStr = null;
+		let closed = true;
+		const v = m[2];
+		for (let i = 0; i < v.length; i++) {
+			const ch = v[i];
+			if (inStr) {
+				if (ch === "\\") i++;
+				else if (ch === inStr) inStr = null;
+				continue;
+			}
+			if (ch === '"' || ch === "'" || ch === "`") {
+				inStr = ch;
+				continue;
+			}
+			if (ch === "[" || ch === "{" || ch === "(") depth++;
+			else if (ch === "]" || ch === "}" || ch === ")") depth--;
+			if (depth > 0) closed = false;
+		}
+		if (!closed) continue;
+		extras.push(line);
+	}
+	return extras;
 }
 
 function pickTags(obj) {
@@ -87,7 +169,7 @@ function pickTags(obj) {
 }
 
 export function parseLink(obj) {
-  return {
+  const link = {
     title: pickString(obj, "title"),
     imgurl: pickString(obj, "imgurl"),
     desc: pickString(obj, "desc"),
@@ -96,15 +178,19 @@ export function parseLink(obj) {
     weight: Number((obj.match(/weight\s*:\s*(-?\d+)/) || [])[1] || 0),
     enabled: (obj.match(/enabled\s*:\s*(true|false)/) || [])[1] !== "false",
   };
+  const extra = pickExtras(obj);
+  if (extra.length) link.extra = extra;
+  return link;
 }
 
 /* ---------- 序列化 ---------- */
 
 const q = (s) => `"${String(s ?? "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
-function serializeLink(link) {
+// 单个友链对象（不含首行缩进与尾逗号，与源文件风格一致）
+function serializeObject(link) {
   const lines = [
-    "\t{",
+    "{",
     `\t\ttitle: ${q(link.title)},`,
     `\t\timgurl: ${q(link.imgurl)},`,
     `\t\tdesc: ${q(link.desc)},`,
@@ -112,14 +198,61 @@ function serializeLink(link) {
     `\t\ttags: [${(link.tags || []).map(q).join(", ")}],`,
     `\t\tweight: ${Number(link.weight) || 0},`,
     `\t\tenabled: ${link.enabled !== false},`,
-    "\t},",
   ];
+  // 保留博客侧额外字段（recommended / recommendedTheme / previewurl 等）
+  for (const line of link.extra || []) lines.push("\t\t" + String(line).replace(/^\s+/, ""));
+  lines.push("\t}");
   return lines.join("\n");
 }
 
-export function serializeLinks(links) {
+function serializeLink(link) {
+  return "\t" + serializeObject(link) + ",";
+}
+
+// 未改动的条目：原样回写，保住行内注释与原格式
+function rawUnchanged(link, raw) {
+  const orig = parseLink(raw);
+  const same = ["title", "imgurl", "desc", "siteurl", "weight", "enabled"].every(
+    (k) => String(orig[k]) === String(link[k]),
+  );
+  return same && JSON.stringify(orig.tags) === JSON.stringify(link.tags || []);
+}
+
+// 在数组段内做局部替换：只重写改动/新增的条目，其余（含被注释掉的模板条目）原样保留。
+// 按 siteurl 匹配原对象，删除 / 重排 / 插入都不会把别人一起重写。
+export function applyLinks(body, links) {
+  const ranges = splitObjectRanges(body);
+  if (!ranges.length) {
+    if (!links.length) return body;
+    return "\n" + links.map(serializeLink).join("\n") + "\n";
+  }
+  const byUrl = new Map();
+  for (const r of ranges) {
+    const url = parseLink(r.text).siteurl;
+    if (url && !byUrl.has(url)) byUrl.set(url, r);
+  }
+  const prefix = body.slice(0, ranges[0].start);
+  const suffix = body.slice(ranges[ranges.length - 1].end + 1);
+  const parts = links.map((link) => {
+    const r = byUrl.get(link.siteurl);
+    if (r && rawUnchanged(link, r.text)) {
+      byUrl.delete(link.siteurl);
+      return r.text;
+    }
+    return serializeObject(link);
+  });
+  if (!parts.length) return "\n";
+  return prefix + parts.join(",\n\t") + suffix;
+}
+
+export function serializeLinks(links, origRaws = []) {
   if (!links.length) return "\n";
-  return "\n" + links.map(serializeLink).join("\n") + "\n";
+  const parts = links.map((link, i) => {
+    const raw = typeof origRaws[i] === "string" ? origRaws[i] : origRaws[i]?.text;
+    if (raw && rawUnchanged(link, raw)) return "\t" + raw + ",";
+    return serializeLink(link);
+  });
+  return "\n" + parts.join("\n") + "\n";
 }
 
 /* ---------- 校验 ---------- */
@@ -194,7 +327,7 @@ export async function onRequestPut({ request, env }) {
   const seg = locateArray(source);
   if (!seg) return json({ error: "friendsConfig.ts 中未找到 friendsConfig 数组，文件格式可能已变更" }, 500);
 
-  const updated = source.slice(0, seg.segStart) + serializeLinks(links) + source.slice(seg.segEnd);
+  const updated = source.slice(0, seg.segStart) + applyLinks(seg.body, links) + source.slice(seg.segEnd);
   try {
     await putFile(
       env,

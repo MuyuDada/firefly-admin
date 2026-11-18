@@ -4,13 +4,14 @@
 const PAGE_NAMES = {
 	dashboard: "工作台",
 	posts: "文章管理",
+	dynamic: "动态",
 	spec: "页面内容",
 	config: "站点配置",
 	assets: "静态资源",
 	links: "友链管理",
 };
 const PRIMARY_COLORS = ["#5D87FF", "#B48DF3", "#1D84FF", "#60C041", "#38C0FC", "#F9901F", "#FF80C8"];
-const BLOG_URL = "https://xane.eu.cc";
+const BLOG_URL = "https://muyudada.dpdns.org/";
 
 const { createApp } = Vue;
 const { ElMessage, ElMessageBox } = ElementPlus;
@@ -130,6 +131,12 @@ const App = {
       assetDragActive: false,
       assetPreviewOpen: false,
       assetPreview: null,
+
+      // 动态（说说）
+      dynList: [],
+      dynLoading: false,
+      dynSaving: false,
+      df: { file: "", date: "", location: "", pinned: false, content: "" },
 
       // 友链
       links: [],
@@ -328,6 +335,10 @@ const App = {
       else if (page === "config") this.loadConfigPage();
       else if (page === "assets") this.loadAssets(this.assetDir);
       else if (page === "links") this.loadLinks();
+      else if (page === "dynamic") {
+        if (!this.df.date) this.resetDynForm();
+        this.loadDynamic();
+      }
     },
 
     /* ---------- 工作台 ---------- */
@@ -997,11 +1008,14 @@ const App = {
     },
     resetLinkForm() {
       this.editingLinkIndex = null;
+      this.lfExtra = [];
       Object.assign(this.lf, { title: "", siteurl: "", imgurl: "", tags: "", desc: "", weight: 0, enabled: true });
     },
     fillLinkForm(link, index) {
       this.resetLinkForm();
       this.editingLinkIndex = index;
+      // 携带博客侧额外字段（recommended / previewurl 等），编辑后不丢失
+      this.lfExtra = Array.isArray(link.extra) ? link.extra.slice() : [];
       Object.assign(this.lf, {
         title: link.title,
         siteurl: link.siteurl,
@@ -1027,6 +1041,7 @@ const App = {
         weight: Math.trunc(Number(this.lf.weight) || 0),
         enabled: this.lf.enabled,
       };
+      if (this.lfExtra && this.lfExtra.length) link.extra = this.lfExtra.slice();
       if (this.editingLinkIndex === null) this.links.push(link);
       else this.links[this.editingLinkIndex] = link;
       this.linksDirty = true;
@@ -1063,6 +1078,76 @@ const App = {
         ElMessage.error(e.message);
       } finally {
         this.savingLinks = false;
+      }
+    },
+
+    /* ---------- 动态（说说） ---------- */
+    resetDynForm() {
+      // 默认当前时间（东八区），与博客现有动态文件格式一致
+      const now = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 19).replace("T", " ");
+      this.df = { file: "", date: now, location: "", pinned: false, content: "" };
+    },
+    openDynForm(row) {
+      this.df = {
+        file: row.file,
+        date: row.date || "",
+        location: row.location || "",
+        pinned: !!row.pinned,
+        content: row.content || "",
+      };
+    },
+    async loadDynamic() {
+      this.dynLoading = true;
+      try {
+        const { posts } = await this.api("/api/shuoshuo");
+        this.dynList = posts;
+      } catch (e) {
+        ElMessage.error(e.message);
+      } finally {
+        this.dynLoading = false;
+      }
+    },
+    async saveDynamic() {
+      if (!this.df.content.trim()) return ElMessage.warning("内容不能为空");
+      this.dynSaving = true;
+      const payload = JSON.stringify({
+        content: this.df.content,
+        date: this.df.date,
+        location: this.df.location,
+        pinned: this.df.pinned,
+      });
+      try {
+        if (this.df.file) {
+          await this.api(`/api/shuoshuo/${encodeURIComponent(this.df.file)}`, { method: "PUT", body: payload });
+        } else {
+          await this.api("/api/shuoshuo", { method: "POST", body: payload });
+        }
+        ElMessage.success("已保存，博客 1-3 分钟内自动更新");
+        this.resetDynForm();
+        await this.loadDynamic();
+      } catch (e) {
+        ElMessage.error(e.message);
+      } finally {
+        this.dynSaving = false;
+      }
+    },
+    async deleteDynamic(row) {
+      try {
+        await ElMessageBox.confirm("确定删除这条动态？", "删除确认", {
+          type: "warning",
+          confirmButtonText: "删除",
+          cancelButtonText: "取消",
+        });
+      } catch {
+        return;
+      }
+      try {
+        await this.api(`/api/shuoshuo/${encodeURIComponent(row.file)}`, { method: "DELETE" });
+        ElMessage.success("已删除");
+        if (this.df.file === row.file) this.resetDynForm();
+        await this.loadDynamic();
+      } catch (e) {
+        ElMessage.error(e.message);
       }
     },
 

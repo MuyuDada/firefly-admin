@@ -27,9 +27,9 @@ export async function onRequestGet({ request, env }) {
           const { data, content } = parseFrontmatter(b64ToUtf8(detail.content || ""));
           return {
             file: f.name,
-            date: data.date || "",
-            tags: Array.isArray(data.tags) ? data.tags : [],
-            image: data.image || "",
+            date: data.published || data.date || "",
+            location: data.location || "",
+            pinned: data.pinned === true || data.pinned === "true",
             content,
           };
         } catch {
@@ -39,7 +39,7 @@ export async function onRequestGet({ request, env }) {
   );
   const posts = list
     .filter(Boolean)
-    .sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0));
+    .sort((a, b) => (Date.parse(String(b.date).replace(" ", "T")) || 0) - (Date.parse(String(a.date).replace(" ", "T")) || 0));
   return json({ posts });
 }
 
