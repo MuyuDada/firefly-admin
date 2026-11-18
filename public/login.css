@@ -1,0 +1,445 @@
+/* Firefly CMS 登录页 —— 参考 guohaolian/animatedlogin 的互动角色设计
+   角色几何与动画时序沿用原实现，配色/布局对齐 CMS 的 --primary 与明暗主题 */
+
+.login-view {
+	display: grid;
+	grid-template-columns: 1.02fr 1fr;
+	align-items: stretch;
+	min-height: 100vh;
+	padding: 0;
+	overflow: hidden;
+	background: var(--content-bg);
+}
+
+/* ---------- 左侧：角色舞台 ---------- */
+.lg-left {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	padding: 40px 48px;
+	overflow: hidden;
+	background:
+		radial-gradient(90% 70% at 15% 0%, color-mix(in srgb, var(--primary, #5d87ff) 42%, transparent), transparent 62%),
+		radial-gradient(70% 60% at 95% 100%, rgba(255, 155, 107, 0.22), transparent 64%),
+		linear-gradient(158deg, #242a5c 0%, #1b1f42 52%, #141731 100%);
+}
+html:not(.dark) .lg-left {
+	background:
+		radial-gradient(90% 70% at 15% 0%, color-mix(in srgb, var(--primary, #5d87ff) 30%, transparent), transparent 62%),
+		radial-gradient(70% 60% at 95% 100%, rgba(255, 155, 107, 0.2), transparent 64%),
+		linear-gradient(158deg, #e9e6f7 0%, #ddd9ee 55%, #cfcadd 100%);
+}
+/* 装饰光晕（与参考页一致的柔光块） */
+.lg-left::after {
+	content: "";
+	position: absolute;
+	top: 18%;
+	right: 12%;
+	width: 280px;
+	height: 280px;
+	border-radius: 50%;
+	background: rgba(180, 170, 200, 0.22);
+	filter: blur(80px);
+	pointer-events: none;
+}
+.lg-left::before {
+	content: "";
+	position: absolute;
+	bottom: 12%;
+	left: 8%;
+	width: 360px;
+	height: 360px;
+	border-radius: 50%;
+	background: rgba(200, 195, 210, 0.18);
+	filter: blur(100px);
+	pointer-events: none;
+}
+
+.lg-brand {
+	position: relative;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	font-weight: 700;
+	font-size: 16px;
+	letter-spacing: 0.02em;
+	color: #fff;
+}
+html:not(.dark) .lg-brand {
+	color: #2a2d4a;
+}
+.lg-brand svg {
+	flex: none;
+	width: 28px;
+	height: 28px;
+	padding: 4px;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.15);
+	backdrop-filter: blur(8px);
+}
+
+/* 角色舞台：与参考页一致 —— 高度 420px，底部对齐，居中 */
+.lg-stage {
+	position: relative;
+	z-index: 3;
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	height: 420px;
+}
+
+.lg-foot {
+	position: relative;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-size: 13px;
+	color: rgba(255, 255, 255, 0.66);
+}
+html:not(.dark) .lg-foot {
+	color: rgba(60, 55, 75, 0.7);
+}
+.lg-foot a {
+	color: inherit;
+	text-decoration: none;
+	transition: color 0.2s ease;
+}
+.lg-foot a:hover {
+	color: #fff;
+}
+html:not(.dark) .lg-foot a:hover {
+	color: #2a2d4a;
+}
+
+/* ---------- 角色 ---------- */
+.characters-scene {
+	position: relative;
+	width: 480px;
+	height: 360px;
+	transform-origin: bottom center;
+}
+.character {
+	position: absolute;
+	bottom: 0;
+	transition: all 0.7s ease-in-out;
+	transform-origin: bottom center;
+}
+.char-purple {
+	left: 60px;
+	width: 170px;
+	height: 370px;
+	background: #6c3ff5;
+	border-radius: 10px 10px 0 0;
+	z-index: 1;
+}
+.char-black {
+	left: 220px;
+	width: 115px;
+	height: 290px;
+	background: #2d2d2d;
+	border-radius: 8px 8px 0 0;
+	z-index: 2;
+}
+.char-orange {
+	left: 0;
+	width: 230px;
+	height: 190px;
+	background: #ff9b6b;
+	border-radius: 115px 115px 0 0;
+	z-index: 3;
+}
+.char-yellow {
+	left: 290px;
+	width: 135px;
+	height: 215px;
+	background: #e8d754;
+	border-radius: 68px 68px 0 0;
+	z-index: 4;
+}
+.eyes {
+	position: absolute;
+	display: flex;
+	transition: all 0.7s ease-in-out;
+}
+.eyeball {
+	border-radius: 50%;
+	background: #fff;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: height 0.15s ease;
+	overflow: hidden;
+}
+.pupil {
+	border-radius: 50%;
+	background: #2d2d2d;
+	transition: transform 0.1s ease-out;
+}
+.bare-pupil {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: #2d2d2d;
+	transition: transform 0.7s ease-in-out;
+}
+.yellow-mouth {
+	position: absolute;
+	width: 50px;
+	height: 4px;
+	background: #2d2d2d;
+	border-radius: 2px;
+	transition: all 0.7s ease-in-out;
+}
+.orange-mouth {
+	position: absolute;
+	width: 28px;
+	height: 14px;
+	border: 3px solid #2d2d2d;
+	border-top: none;
+	border-radius: 0 0 14px 14px;
+	opacity: 0;
+	transition: all 0.7s ease-in-out;
+}
+.orange-mouth.visible {
+	opacity: 1;
+}
+@keyframes shakeHead {
+	0%,
+	100% {
+		translate: 0 0;
+	}
+	10% {
+		translate: -9px 0;
+	}
+	20% {
+		translate: 7px 0;
+	}
+	30% {
+		translate: -6px 0;
+	}
+	40% {
+		translate: 6px 0;
+	}
+	50% {
+		translate: -4px 0;
+	}
+	60% {
+		translate: 4px 0;
+	}
+	70% {
+		translate: -2px 0;
+	}
+	80% {
+		translate: 2px 0;
+	}
+	90% {
+		translate: -1px 0;
+	}
+}
+.eyes.shake-head,
+.yellow-mouth.shake-head,
+.orange-mouth.shake-head {
+	animation: shakeHead 0.8s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* ---------- 右侧：表单 ---------- */
+.lg-right {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 40px 28px;
+	background: var(--content-bg);
+}
+.lg-form {
+	width: 100%;
+	max-width: 372px;
+}
+.lg-spark {
+	width: 40px;
+	height: 40px;
+	display: grid;
+	place-items: center;
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--primary, #5d87ff) 14%, transparent);
+	margin-bottom: 22px;
+}
+.lg-spark svg {
+	width: 20px;
+	height: 20px;
+}
+.lg-title {
+	margin: 0 0 6px;
+	font-size: 26px;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	color: var(--text);
+}
+.lg-sub {
+	margin: 0 0 26px;
+	font-size: 13.5px;
+	color: var(--muted);
+}
+.lg-group {
+	margin-bottom: 18px;
+}
+.lg-label {
+	display: block;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--muted);
+	margin-bottom: 8px;
+	letter-spacing: 0.02em;
+}
+.lg-label.error-label {
+	color: var(--danger, #e5484d);
+}
+.lg-input-wrap {
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+.lg-input {
+	width: 100%;
+	height: 46px;
+	padding: 0 44px 0 14px;
+	font-size: 15px;
+	color: var(--text);
+	background: var(--card-bg);
+	border: 1px solid var(--card-border);
+	border-radius: calc(var(--radius) + 2px);
+	outline: none;
+	transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.lg-input::placeholder {
+	color: var(--muted);
+}
+.lg-input:focus {
+	border-color: color-mix(in srgb, var(--primary, #5d87ff) 62%, var(--card-border));
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary, #5d87ff) 14%, transparent);
+}
+.lg-input.error {
+	border-color: var(--danger, #e5484d);
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger, #e5484d) 12%, transparent);
+}
+.lg-eye {
+	position: absolute;
+	right: 8px;
+	width: 32px;
+	height: 32px;
+	display: grid;
+	place-items: center;
+	border: none;
+	background: transparent;
+	color: var(--muted);
+	cursor: pointer;
+	border-radius: 8px;
+}
+.lg-eye:hover {
+	color: var(--text);
+	background: var(--menu-hover-bg, rgba(0, 0, 0, 0.05));
+}
+.lg-error {
+	display: none;
+	margin-bottom: 16px;
+	padding: 10px 14px;
+	font-size: 12.5px;
+	line-height: 1.5;
+	color: var(--danger, #e5484d);
+	background: color-mix(in srgb, var(--danger, #e5484d) 9%, transparent);
+	border: 1px solid color-mix(in srgb, var(--danger, #e5484d) 22%, transparent);
+	border-radius: 10px;
+}
+.lg-error.show {
+	display: block;
+}
+
+/* 登录按钮：文字滑出 + 箭头滑入 */
+.lg-btn {
+	position: relative;
+	width: 100%;
+	height: 48px;
+	margin-top: 4px;
+	border: none;
+	border-radius: calc(var(--radius) + 2px);
+	background: var(--text);
+	color: var(--card-bg);
+	font-size: 15px;
+	font-weight: 600;
+	cursor: pointer;
+	overflow: hidden;
+	transition: background 0.25s ease, transform 0.15s ease;
+}
+.lg-btn:hover {
+	background: var(--primary, #5d87ff);
+}
+.lg-btn:active {
+	transform: scale(0.99);
+}
+.lg-btn:disabled {
+	opacity: 0.72;
+	cursor: default;
+}
+.lg-btn .lg-btn-text,
+.lg-btn .lg-btn-hover {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+.lg-btn .lg-btn-hover {
+	transform: translateX(100%);
+	opacity: 0;
+}
+.lg-btn:hover .lg-btn-text {
+	transform: translateX(-100%);
+	opacity: 0;
+}
+.lg-btn:hover .lg-btn-hover {
+	transform: translateX(0);
+	opacity: 1;
+}
+
+.lg-meta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 18px;
+	font-size: 12.5px;
+	color: var(--muted);
+}
+.lg-meta .dot {
+	width: 4px;
+	height: 4px;
+	border-radius: 50%;
+	background: currentColor;
+	opacity: 0.5;
+}
+.lg-foot-right {
+	margin-top: 34px;
+	font-size: 12px;
+	color: var(--muted);
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 1000px) {
+	.characters-scene {
+		transform: scale(0.86);
+	}
+}
+@media (max-width: 900px) {
+	.login-view {
+		grid-template-columns: 1fr;
+	}
+	.lg-left {
+		display: none;
+	}
+	.lg-right {
+		padding: 32px 20px;
+	}
+}

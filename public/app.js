@@ -185,6 +185,14 @@ const App = {
       if (!this.pf.image) return "";
       return this.pf.image.startsWith("./") ? this.pf.image.replace("./", "/posts/") : this.pf.image;
     },
+    dynImages() {
+      const out = [];
+      const re = /!\[([^\]]*)\]\((\S+?)(?:\s+["'][^"']*["'])?\)/g;
+      const text = this.df.content || "";
+      let m;
+      while ((m = re.exec(text))) out.push({ alt: m[1], src: m[2], raw: m[0] });
+      return out;
+    },
     linksCountText() {
       const enabled = this.links.filter((l) => l.enabled).length;
       return `共 ${this.links.length} 条 · 启用 ${enabled} 条${this.linksDirty ? " · 有未保存修改" : ""}`;
@@ -250,7 +258,11 @@ const App = {
 
     /* ---------- 登录 / 退出 ---------- */
     async login() {
-      if (!this.password) return;
+      if (!this.password) {
+        ElMessage.warning("请输入访问密码");
+        if (window.cmsLoginError) window.cmsLoginError("请先输入访问密码");
+        return;
+      }
       this.loginLoading = true;
       try {
         const { token } = await this.api("/api/login", {
@@ -264,6 +276,8 @@ const App = {
         this.handleMenuSelect("dashboard");
       } catch (e) {
         ElMessage.error(e.message);
+        // 让登录页的角色摇头 + 显示错误
+        if (window.cmsLoginError) window.cmsLoginError(e.message);
       } finally {
         this.loginLoading = false;
       }
@@ -1082,6 +1096,41 @@ const App = {
     },
 
     /* ---------- 动态（说说） ---------- */
+    async onDynImagePick(e) {
+      const files = Array.from(e.target.files || []);
+      e.target.value = "";
+      if (files.length) await this.addDynImages(files);
+    },
+    async onDynDrop(e) {
+      const files = this.pickImageFiles(e.dataTransfer);
+      if (!files.length) return;
+      await this.addDynImages(files);
+    },
+    async onDynPaste(e) {
+      const files = this.pasteImageFiles(e);
+      if (!files.length) return;
+      e.preventDefault();
+      await this.addDynImages(files);
+    },
+    async addDynImages(files) {
+      const urls = await this.uploadImageFiles(files, "shuoshuo");
+      if (!urls.length) return;
+      const md = urls
+        .map((u) => {
+          const name = decodeURIComponent(String(u).split("/").pop() || "image");
+          return `![${name.replace(/^\d+_/, "").replace(/\.[^.]+$/, "")}](${u})`;
+        })
+        .join("\n");
+      const body = (this.df.content || "").replace(/\s+$/, "");
+      this.df.content = (body ? body + "\n\n" : "") + md;
+      ElMessage.success(`已插入 ${urls.length} 张图片`);
+    },
+    removeDynImage(item) {
+      this.df.content = (this.df.content || "")
+        .replace(item.raw, "")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    },
     resetDynForm() {
       // 默认当前时间（东八区），与博客现有动态文件格式一致
       const now = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 19).replace("T", " ");
