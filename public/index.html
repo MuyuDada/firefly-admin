@@ -7,7 +7,7 @@
     <title>Firefly CMS</title>
     <link rel="stylesheet" href="/vendor/element-plus.css" />
     <link rel="stylesheet" href="/vendor/element-plus-dark.css" />
-    <link rel="stylesheet" href="/style.css?v=3.8" />
+    <link rel="stylesheet" href="/style.css?v=3.9" />
     <link rel="stylesheet" href="/login.css?v=2" />
     <script>
       // 提前应用主题（默认暗色），避免闪烁
@@ -862,6 +862,32 @@
             <div class="setting-label">界面圆角<span class="muted">{{ radius }}px</span></div>
             <el-slider v-model="radius" :min="0" :max="24" :step="2" @change="setRadius"></el-slider>
           </div>
+
+          <div class="setting-divider"></div>
+
+          <div class="setting-block">
+            <div class="setting-label">图片上传</div>
+            <div class="switch-row" style="padding: 0">
+              <span class="muted">自动转 WebP</span>
+              <el-switch v-model="imgConvert" @change="saveImgOpts"></el-switch>
+            </div>
+            <template v-if="imgConvert">
+              <div class="setting-label" style="margin-top: 14px">
+                压缩质量<span class="muted">{{ imgQuality }}%</span>
+              </div>
+              <el-slider v-model="imgQuality" :min="50" :max="100" :step="1" @change="saveImgOpts"></el-slider>
+              <div class="setting-label" style="margin-top: 10px">最大边长</div>
+              <el-select v-model="imgMaxEdge" style="width: 100%" @change="saveImgOpts">
+                <el-option label="不限制（只转格式）" :value="0"></el-option>
+                <el-option label="1600 px" :value="1600"></el-option>
+                <el-option label="1920 px" :value="1920"></el-option>
+                <el-option label="2560 px（默认）" :value="2560"></el-option>
+                <el-option label="3200 px" :value="3200"></el-option>
+                <el-option label="4096 px" :value="4096"></el-option>
+              </el-select>
+              <div class="setting-tip">GIF / SVG / WebP / AVIF 不转换；转完反而更大时保留原图</div>
+            </template>
+          </div>
         </el-drawer>
       </div>
     </div>
@@ -871,7 +897,7 @@
     <script src="/vendor/zh-cn.min.js"></script>
     <script src="/vendor/element-icons.iife.min.js"></script>
     <script src="/config-forms.js?v=3.5"></script>
-    <script src="/app.js?v=3.3"></script>
+    <script src="/app.js?v=3.4"></script>
     <script src="/login.js?v=2"></script>
   </body>
 </html>

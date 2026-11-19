@@ -1142,3 +1142,16 @@ html:not(.dark) .login-card {
   color: var(--muted);
   background: color-mix(in srgb, var(--primary, #5d87ff) 9%, transparent);
 }
+
+/* 设置抽屉：图片选项 */
+.setting-divider {
+  height: 1px;
+  margin: 16px 0;
+  background: var(--card-border);
+}
+.setting-tip {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}

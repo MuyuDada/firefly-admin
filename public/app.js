@@ -64,6 +64,10 @@ const App = {
 
       // 主题
       dark: document.documentElement.classList.contains("dark"),
+      // 图片上传选项（跟随浏览器，不影响他人）
+      imgConvert: localStorage.getItem("cms_img_convert") !== "0",
+      imgQuality: Number(localStorage.getItem("cms_img_quality")) || 86,
+      imgMaxEdge: localStorage.getItem("cms_img_maxedge") === null ? 2560 : Number(localStorage.getItem("cms_img_maxedge")),
       primary: localStorage.getItem("cms_primary") || PRIMARY_COLORS[0],
       radius: Number(localStorage.getItem("cms_radius")) || 12,
       settingsOpen: false,
@@ -525,14 +529,14 @@ const App = {
     async toWebp(file) {
       const type = String(file.type || "").toLowerCase();
       const KEEP = ["image/gif", "image/svg+xml", "image/webp", "image/avif"];
-      if (!type.startsWith("image/") || KEEP.includes(type)) {
+      if (!this.imgConvert || !type.startsWith("image/") || KEEP.includes(type)) {
         return { blob: file, name: file.name };
       }
-      const MAX_EDGE = 2560;
-      const QUALITY = 0.86;
+      const MAX_EDGE = Number(this.imgMaxEdge) > 0 ? Number(this.imgMaxEdge) : 0;
+      const QUALITY = Math.min(1, Math.max(0.4, (Number(this.imgQuality) || 86) / 100));
       try {
         const bitmap = await createImageBitmap(file);
-        const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+        const scale = MAX_EDGE > 0 ? Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height)) : 1;
         const w = Math.max(1, Math.round(bitmap.width * scale));
         const h = Math.max(1, Math.round(bitmap.height * scale));
         const canvas = document.createElement("canvas");
@@ -671,6 +675,11 @@ const App = {
       } catch (err) {
         ElMessage.error(err.message);
       }
+    },
+    saveImgOpts() {
+      localStorage.setItem("cms_img_convert", this.imgConvert ? "1" : "0");
+      localStorage.setItem("cms_img_quality", String(this.imgQuality));
+      localStorage.setItem("cms_img_maxedge", String(this.imgMaxEdge));
     },
     useRandomCover() {
       this.pf.image = "api";
