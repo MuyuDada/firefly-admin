@@ -182,7 +182,7 @@ const App = {
       return this.editingPostFile ? "保存修改" : this.pf.draft ? "存为草稿" : "发布文章";
     },
     coverSrc() {
-      if (!this.pf.image) return "";
+      if (!this.pf.image || this.pf.image === "api") return "";
       return this.pf.image.startsWith("./") ? this.pf.image.replace("./", "/posts/") : this.pf.image;
     },
     dynImages() {
@@ -521,12 +521,45 @@ const App = {
         reader.readAsDataURL(file);
       });
     },
+    // 上传前压缩：位图统一转 WebP（长边超过 MAX_EDGE 等比缩小），GIF/SVG 保持原样
+    async toWebp(file) {
+      const type = String(file.type || "").toLowerCase();
+      const KEEP = ["image/gif", "image/svg+xml", "image/webp", "image/avif"];
+      if (!type.startsWith("image/") || KEEP.includes(type)) {
+        return { blob: file, name: file.name };
+      }
+      const MAX_EDGE = 2560;
+      const QUALITY = 0.86;
+      try {
+        const bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+        const w = Math.max(1, Math.round(bitmap.width * scale));
+        const h = Math.max(1, Math.round(bitmap.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return { blob: file, name: file.name };
+        ctx.drawImage(bitmap, 0, 0, w, h);
+        bitmap.close?.();
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", QUALITY));
+        // 浏览器不支持编码 WebP 时会回落到 png，此时保留原图，避免扩展名与内容不符
+        if (!blob || blob.size === 0 || blob.type !== "image/webp") return { blob: file, name: file.name };
+        // 转完反而更大（原图本身就是高压缩小图）时保留原图
+        if (blob.size > file.size && scale === 1) return { blob: file, name: file.name };
+        const name = file.name.replace(/\.[^.]+$/, "") + ".webp";
+        return { blob, name };
+      } catch {
+        return { blob: file, name: file.name };
+      }
+    },
     async uploadImageFile(file, dir) {
-      const data = await this.readFileB64(file);
+      const { blob, name } = await this.toWebp(file);
+      const data = await this.readFileB64(blob);
       return this.api("/api/imgbed/upload", {
         method: "POST",
-        body: JSON.stringify({ filename: file.name, data, dir }),
-        timeout: 90000, // 大图经代理转图床较慢，放宽到 90 秒
+        body: JSON.stringify({ filename: name, data, dir }),
+        timeout: 120000, // 大图经代理转图床较慢，放宽到 120 秒
       });
     },
     // 批量上传图片到图床，返回外链数组
@@ -638,6 +671,10 @@ const App = {
       } catch (err) {
         ElMessage.error(err.message);
       }
+    },
+    useRandomCover() {
+      this.pf.image = "api";
+      ElMessage.success("已设为随机封面，保存后生效");
     },
     async onCoverUpload(e) {
       const file = e.target.files[0];

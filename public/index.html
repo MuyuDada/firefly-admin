@@ -409,16 +409,26 @@
                         <el-input v-model="pf.description" type="textarea" :rows="3" placeholder="显示在文章列表与卡片上的一句话"></el-input>
                       </div>
                       <div class="field">
-                        <span class="field-label">封面图</span>
-                        <div v-if="pf.image" class="img-preview">
-                          <img :src="coverSrc" alt="封面预览" />
-                          <span class="img-path">{{ pf.image }}</span>
-                          <el-button size="small" type="danger" plain @click="pf.image = ''">移除</el-button>
+                        <span class="field-label">封面图（可直接粘贴外链）</span>
+                        <el-input v-model="pf.image" placeholder="https://图床/xx.webp，或点「随机封面」留空自动取图">
+                          <template #append>
+                            <el-button @click="$refs.pCover.click()">
+                              <el-icon><epi-upload></epi-upload></el-icon><span>上传</span>
+                            </el-button>
+                          </template>
+                        </el-input>
+                        <div class="cover-actions">
+                          <el-button size="small" :type="pf.image === 'api' ? 'primary' : ''" plain @click="useRandomCover">随机封面 API</el-button>
+                          <el-button size="small" plain :disabled="!pf.image" @click="pf.image = ''">清空</el-button>
                         </div>
-                        <el-button class="block" plain @click="$refs.pCover.click()">
-                          <el-icon><epi-upload></epi-upload></el-icon><span>上传封面</span>
-                        </el-button>
-                        <input ref="pCover" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif" hidden @change="onCoverUpload" />
+                        <div v-if="pf.image === 'api'" class="cover-hint">
+                          已启用随机封面：构建时从 coverImageConfig.randomCoverImage.apis 里随机取一张，每次构建可能不同
+                        </div>
+                        <div v-else-if="pf.image" class="img-preview">
+                          <img :src="coverSrc" alt="封面预览" loading="lazy" />
+                          <span class="img-path">{{ pf.image }}</span>
+                        </div>
+                        <input ref="pCover" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/svg+xml" hidden @change="onCoverUpload" />
                       </div>
                       <div class="switch-col">
                         <div class="switch-row"><span>草稿（保存后博客不展示）</span><el-switch v-model="pf.draft"></el-switch></div>
