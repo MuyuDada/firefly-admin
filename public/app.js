@@ -68,6 +68,7 @@ const App = {
       imgConvert: localStorage.getItem("cms_img_convert") !== "0",
       imgQuality: Number(localStorage.getItem("cms_img_quality")) || 86,
       imgMaxEdge: localStorage.getItem("cms_img_maxedge") === null ? 2560 : Number(localStorage.getItem("cms_img_maxedge")),
+      liveUploading: false,
       primary: localStorage.getItem("cms_primary") || PRIMARY_COLORS[0],
       radius: Number(localStorage.getItem("cms_radius")) || 12,
       settingsOpen: false,
@@ -555,6 +556,45 @@ const App = {
         return { blob, name };
       } catch {
         return { blob: file, name: file.name };
+      }
+    },
+    // 原样上传（视频、GIF 等不做转码）
+    async uploadRawFile(file, dir) {
+      const data = await this.readFileB64(file);
+      return this.api("/api/imgbed/upload", {
+        method: "POST",
+        body: JSON.stringify({ filename: file.name, data, dir }),
+        timeout: 180000,
+      });
+    },
+    // 实况照片：一张静图 + 一段短视频 → 插入 ::livephoto 指令
+    async onLivePhotoPick(e) {
+      const files = Array.from(e.target.files || []);
+      e.target.value = "";
+      if (!files.length) return;
+      const images = files.filter((f) => String(f.type).startsWith("image/"));
+      const videos = files.filter((f) => String(f.type).startsWith("video/"));
+      if (!images.length || !videos.length) {
+        return ElMessage.warning("实况照片需要同时选一张静图和一段视频（可一次多选）");
+      }
+      if (videos.some((v) => /\.mov$/i.test(v.name))) {
+        return ElMessage.warning("MOV 浏览器无法播放，请先用 ffmpeg 转成 MP4 再上传");
+      }
+      this.liveUploading = true;
+      try {
+        const [{ path: photo }, { path: video }] = await Promise.all([
+          this.uploadImageFile(images[0], "post"),
+          this.uploadRawFile(videos[0], "post"),
+        ]);
+        const alt = images[0].name.replace(/\.[^.]+$/, "").replace(/[\"{}]/g, "");
+        await this.insertAtCursor(
+          `\n\n::livephoto{photo="${photo}" video="${video}" alt="${alt}"}\n\n`,
+        );
+        ElMessage.success("实况照片已插入，预览需等文章发布后查看");
+      } catch (err) {
+        ElMessage.error(err.message);
+      } finally {
+        this.liveUploading = false;
       }
     },
     async uploadImageFile(file, dir) {

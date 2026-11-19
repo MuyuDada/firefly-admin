@@ -361,6 +361,17 @@
                           <el-icon><epi-picture></epi-picture></el-icon><span>插图</span>
                         </el-button>
                         <input ref="pImage" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif" hidden @change="onInsertImage" />
+                        <el-button size="small" plain :loading="liveUploading" @click="$refs.pLive.click()">
+                          <el-icon><epi-video-camera></epi-video-camera></el-icon><span>实况照片</span>
+                        </el-button>
+                        <input
+                          ref="pLive"
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/avif,video/mp4,video/webm"
+                          multiple
+                          hidden
+                          @change="onLivePhotoPick"
+                        />
                         <span class="flex-spacer"></span>
                         <span class="muted md-hint">可直接拖入或 Ctrl+V 粘贴图片</span>
                       </div>
@@ -897,7 +908,7 @@
     <script src="/vendor/zh-cn.min.js"></script>
     <script src="/vendor/element-icons.iife.min.js"></script>
     <script src="/config-forms.js?v=3.5"></script>
-    <script src="/app.js?v=3.4"></script>
+    <script src="/app.js?v=3.5"></script>
     <script src="/login.js?v=2"></script>
   </body>
 </html>

@@ -8,7 +8,7 @@
 import { json } from "../_gh.js";
 import { requireAuth, unauthorized } from "../_auth.js";
 
-const EXT_WHITELIST = ["png", "jpg", "jpeg", "gif", "webp", "avif"];
+const EXT_WHITELIST = ["png", "jpg", "jpeg", "gif", "webp", "avif", "mp4", "webm", "mov"];
 const MIME = {
   png: "image/png",
   jpg: "image/jpeg",
@@ -16,10 +16,15 @@ const MIME = {
   gif: "image/gif",
   webp: "image/webp",
   avif: "image/avif",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
 };
+const VIDEO_EXT = new Set(["mp4", "webm", "mov"]);
 const FOLDER = { post: "blog/posts", shuoshuo: "blog/shuoshuo", config: "blog/config" };
 // base64 后约 20MB（原图约 15MB），Pages Functions 请求上限 100MB
 const MAX_B64 = 20 * 1024 * 1024;
+const MAX_B64_VIDEO = 60 * 1024 * 1024;
 
 function b64ToBlob(b64, type) {
   const bin = atob(b64);
@@ -58,8 +63,11 @@ export async function onRequestPost({ request, env }) {
   if (!body.data || typeof body.data !== "string") {
     return json({ error: "缺少图片数据" }, 400);
   }
-  if (body.data.length > MAX_B64) {
-    return json({ error: "图片过大，请压缩到 15MB 以内再上传" }, 413);
+  // 视频（实况照片的动态部分）放宽到 45MB 原文件（base64 后约 60MB）
+  const limit = VIDEO_EXT.has(ext) ? MAX_B64_VIDEO : MAX_B64;
+  if (body.data.length > limit) {
+    const mb = VIDEO_EXT.has(ext) ? 45 : 15;
+    return json({ error: `文件过大，请压缩到 ${mb}MB 以内再上传` }, 413);
   }
 
   // 去掉可能存在的 data:*;base64, 前缀
